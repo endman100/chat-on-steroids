@@ -314,6 +314,7 @@ export interface Config {
   /** Inactive setups only. Keys remain in encrypted secret slots addressed by profile ID. */
   setupProfiles?: Array<{ id: string; name: string; tunnelId: string; desktopTunnelId: string; pluginsTunnelId: string }>;
   roots: Root[];
+  externalSkillsRoots: string[];
   capabilities: Capabilities;
   readOnly: boolean;
   tunnel: TunnelSettings;

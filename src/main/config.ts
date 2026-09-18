@@ -258,6 +258,7 @@ const configSchema = z.object({
     .array(rootSchema)
     .max(32)
     .transform(uniqueStoredRoots),
+  externalSkillsRoots: z.array(z.string().trim().refine(path.isAbsolute, 'External Skills roots must be absolute paths')).optional().default([]),
   capabilities: capabilitiesSchema,
   readOnly: z.boolean(),
   tunnel: z.object({
@@ -458,6 +459,7 @@ function firstLaunchCapabilities(platform: NodeJS.Platform, release?: string): C
 export function defaultConfig(platform: NodeJS.Platform = process.platform, release?: string): Config {
   return {
     roots: [],
+    externalSkillsRoots: [],
     capabilities: firstLaunchCapabilities(platform, release),
     readOnly: false,
     tunnel: { kind: 'openai', tunnelId: '', desktopTunnelId: '', binaryPath: '' },

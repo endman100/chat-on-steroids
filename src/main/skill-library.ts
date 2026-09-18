@@ -5,19 +5,20 @@ import { createHash } from 'node:crypto';
 import { rawPromises as fs } from './rawfs.js';
 import { effectiveCapabilities, getConfig } from './config.js';
 import { isContained, resolvePath } from './sandbox.js';
+import { withManagedSkills } from './skill-access.js';
 import { listSkills, readSkill, readSkillTextSnapshot, skillsDirectory, type SkillDocument } from './skills.js';
 import { parseSkillConfiguration, parseSkillFrontmatter, parseSkillInterface, type SkillConfiguration } from './skill-metadata.js';
 import type { SkillLibrary, SkillMetadata, SkillScope, SkillSource } from '../shared/skills.js';
 
 export interface SkillLibraryScope { projectPath?: string | null }
-type Candidate = { file: string; scope: SkillScope; source: SkillSource };
+type Candidate = { file: string; scope: SkillScope; source: SkillSource; shallow?: boolean };
 const identity = (file: string): string => process.platform === 'win32' ? path.resolve(file).toLowerCase() : path.resolve(file);
 const samePath = (a: string, b: string): boolean => identity(a) === identity(b);
 const errorText = (error: unknown): string => error instanceof Error ? error.message : String(error);
 
 async function approved(file: string, allowMissing = false): Promise<{ real: string; virtual: string }> {
   if (!effectiveCapabilities(getConfig()).read) throw new Error('Read files permission is required for discovered Skills');
-  return resolvePath(getConfig().roots, file, { allowMissing });
+  return resolvePath(withManagedSkills({ roots: getConfig().roots }).roots, file, { allowMissing });
 }
 async function readApproved(file: string): Promise<{ real: string; virtual: string; text: string }> {
   const target = await approved(file);
@@ -74,6 +75,7 @@ async function locations(scope: SkillLibraryScope): Promise<{ roots: Candidate[]
     }
     roots.push({ file: path.join(project.real, '.codex', 'skills'), scope: 'repo', source: 'project-codex' });
   }
+  for (const file of getConfig().externalSkillsRoots) roots.push({ file, scope: 'user', source: 'user-agents', shallow: true });
   roots.push(
     { file: path.join(home, '.agents', 'skills'), scope: 'user', source: 'user-agents' },
     { file: path.join(codex, 'skills'), scope: 'user', source: 'codex-home' },
@@ -170,6 +172,7 @@ export async function listSkillLibrary(scope: SkillLibraryScope = {}): Promise<S
           }
         } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') addError(`${candidate.source}: ${errorText(error)}`); }
         if (hasSkill) continue; // Package references are resources, not a second catalog.
+        if (candidate.shallow && current.depth >= 1) continue;
         for await (const entry of await fs.opendir(current.directory)) {
           if (++entries > 4096) break;
           if (entry.name.startsWith('.') || current.depth >= 6) continue;
